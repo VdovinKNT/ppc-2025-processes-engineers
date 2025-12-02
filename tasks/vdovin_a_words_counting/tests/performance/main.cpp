@@ -13,7 +13,7 @@ namespace vdovin_a_words_counting {
 
 class VdovinAWordsCountingRunPerfTestProcesses : public ppc::util::BaseRunPerfTests<InType, OutType> {
   const int kSeed_ = 123;
-  const int correct_test_ = 10000;
+  const int correct_test_ = 1000000;
   InType input_data_;
 
   void SetUp() override {
