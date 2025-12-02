@@ -1,7 +1,5 @@
 #include "vdovin_a_words_counting/seq/include/ops_seq.hpp"
 
-#include <cstddef>
-
 #include "vdovin_a_words_counting/common/include/common.hpp"
 
 namespace vdovin_a_words_counting {

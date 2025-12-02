@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <cstddef>
 #include <random>
 #include <string>
 
@@ -21,7 +22,7 @@ class VdovinAWordsCountingRunPerfTestProcesses : public ppc::util::BaseRunPerfTe
     std::uniform_int_distribution<> chars('a', 'z');
 
     std::string test;
-    test.reserve(static_cast<std::size_t>(correct_test_) * 12u);
+    test.reserve(static_cast<std::size_t>(correct_test_) * 12U);
 
     for (int i = 0; i < correct_test_; ++i) {
       int t_len = word_len(gen);

@@ -5,14 +5,15 @@
 #include <array>
 #include <cstddef>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "vdovin_a_words_counting/common/include/common.hpp"
 
 namespace vdovin_a_words_counting {
 
-static std::pair<int, std::array<char, 2>> CountWordsInRange(const std::string &input, std::size_t begin,
-                                                             std::size_t end) {
+namespace {
+std::pair<int, std::array<char, 2>> CountWordsInRange(const std::string &input, std::size_t begin, std::size_t end) {
   int counter = 0;
   bool on_word = false;
   for (std::size_t i = begin; i < end; ++i) {
@@ -35,6 +36,7 @@ static std::pair<int, std::array<char, 2>> CountWordsInRange(const std::string &
 
   return {counter, flags};
 }
+}  // namespace
 
 VdovinAWordsCountingMPI::VdovinAWordsCountingMPI(const InType &in) {
   SetTypeOfTask(GetStaticTypeOfTask());
@@ -83,8 +85,8 @@ bool VdovinAWordsCountingMPI::RunImpl() {
 
   if (rank == 0) {
     for (int i = 1; i < size; ++i) {
-      const std::size_t prev_end_idx = static_cast<std::size_t>(i) * 2u - 1u;
-      const std::size_t curr_begin_idx = prev_end_idx + 1u;
+      const std::size_t prev_end_idx = (static_cast<std::size_t>(i) * 2U) - 1U;
+      const std::size_t curr_begin_idx = prev_end_idx + 1U;
       if ((all_flags[prev_end_idx] == 1) && (all_flags[curr_begin_idx] == 1)) {
         --counter_sum;
       }

@@ -30,7 +30,7 @@ class VdovinAWordsCountingRunFuncTestsProcesses : public ppc::util::BaseRunFuncT
 
     correct_test_ = std::get<2>(params);
     std::string test;
-    test.reserve(static_cast<std::size_t>(correct_test_) * 12u);
+    test.reserve(static_cast<std::size_t>(correct_test_) * 12U);
 
     for (int i = 0; i < correct_test_; ++i) {
       int t_len = word_len(gen);
