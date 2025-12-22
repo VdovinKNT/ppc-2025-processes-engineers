@@ -53,30 +53,50 @@ bool VdovinAWordsCountingMPI::PreProcessingImpl() {
 }
 
 bool VdovinAWordsCountingMPI::RunImpl() {
-  auto input = GetInput();
-  if (input.empty()) {
-    return false;
-  }
   int rank = 0;
   int size = 0;
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
   MPI_Comm_size(MPI_COMM_WORLD, &size);
 
-  const std::size_t chunk = input.size() / static_cast<std::size_t>(size);
-  const std::size_t begin = chunk * static_cast<std::size_t>(rank);
-  std::size_t end = begin + chunk;
-  if (rank == size - 1) {
-    end = input.size();
+  std::string input;
+  std::vector<int> send_counts(size, 0);
+  std::vector<int> send_displs(size, 0);
+
+  if (rank == 0) {
+    input = GetInput();
+    if (input.empty()) {
+      return false;
+    }
+
+    const std::size_t chunk = input.size() / static_cast<std::size_t>(size);
+    for (int i = 0; i < size; ++i) {
+      send_displs[i] = static_cast<int>(chunk * static_cast<std::size_t>(i));
+      if (i == size - 1) {
+        send_counts[i] = static_cast<int>(input.size()) - send_displs[i];
+      } else {
+        send_counts[i] = static_cast<int>(chunk);
+      }
+    }
   }
 
-  std::array<char, 2> local_flags = {0, 0};
+  MPI_Bcast(send_counts.data(), size, MPI_INT, 0, MPI_COMM_WORLD);
+  MPI_Bcast(send_displs.data(), size, MPI_INT, 0, MPI_COMM_WORLD);
+
+  int local_size = send_counts[rank];
+  std::vector<char> local_data(local_size);
+
+  MPI_Scatterv(rank == 0 ? const_cast<char *>(input.c_str()) : nullptr, send_counts.data(), send_displs.data(),
+               MPI_CHAR, local_data.data(), local_size, MPI_CHAR, 0, MPI_COMM_WORLD);
+
+  std::string local_input(local_data.begin(), local_data.end());
+
+  auto [counter, flags] = CountWordsInRange(local_input, 0, local_input.size());
+  std::array<char, 2> local_flags = flags;
+
   std::vector<char> all_flags;
   if (rank == 0) {
     all_flags.resize(static_cast<std::size_t>(2) * static_cast<std::size_t>(size), 0);
   }
-
-  auto [counter, flags] = CountWordsInRange(input, begin, end);
-  local_flags = flags;
 
   MPI_Gather(local_flags.data(), 2, MPI_CHAR, (rank == 0 ? all_flags.data() : nullptr), 2, MPI_CHAR, 0, MPI_COMM_WORLD);
 
@@ -91,6 +111,7 @@ bool VdovinAWordsCountingMPI::RunImpl() {
         --counter_sum;
       }
     }
+    GetOutput() = counter_sum;
   }
 
   MPI_Bcast(&counter_sum, 1, MPI_INT, 0, MPI_COMM_WORLD);
