@@ -36,6 +36,29 @@ std::pair<int, std::array<char, 2>> CountWordsInRange(const std::string &input, 
 
   return {counter, flags};
 }
+
+void ComputeSendCountsAndDispls(const std::string &input, int size, std::vector<int> &send_counts,
+                                std::vector<int> &send_displs) {
+  const std::size_t chunk = input.size() / static_cast<std::size_t>(size);
+  for (int i = 0; i < size; ++i) {
+    send_displs[i] = static_cast<int>(chunk * static_cast<std::size_t>(i));
+    if (i == size - 1) {
+      send_counts[i] = static_cast<int>(input.size()) - send_displs[i];
+    } else {
+      send_counts[i] = static_cast<int>(chunk);
+    }
+  }
+}
+
+void ProcessBoundaryFlagMatching(const std::vector<char> &all_flags, int size, int &counter_sum) {
+  for (int i = 1; i < size; ++i) {
+    const std::size_t prev_end_idx = (static_cast<std::size_t>(i) * 2U) - 1U;
+    const std::size_t curr_begin_idx = prev_end_idx + 1U;
+    if ((all_flags[prev_end_idx] == 1) && (all_flags[curr_begin_idx] == 1)) {
+      --counter_sum;
+    }
+  }
+}
 }  // namespace
 
 VdovinAWordsCountingMPI::VdovinAWordsCountingMPI(const InType &in) {
@@ -67,16 +90,7 @@ bool VdovinAWordsCountingMPI::RunImpl() {
     if (input.empty()) {
       return false;
     }
-
-    const std::size_t chunk = input.size() / static_cast<std::size_t>(size);
-    for (int i = 0; i < size; ++i) {
-      send_displs[i] = static_cast<int>(chunk * static_cast<std::size_t>(i));
-      if (i == size - 1) {
-        send_counts[i] = static_cast<int>(input.size()) - send_displs[i];
-      } else {
-        send_counts[i] = static_cast<int>(chunk);
-      }
-    }
+    ComputeSendCountsAndDispls(input, size, send_counts, send_displs);
   }
 
   MPI_Bcast(send_counts.data(), size, MPI_INT, 0, MPI_COMM_WORLD);
@@ -85,7 +99,12 @@ bool VdovinAWordsCountingMPI::RunImpl() {
   int local_size = send_counts[rank];
   std::vector<char> local_data(local_size);
 
-  MPI_Scatterv(rank == 0 ? const_cast<char *>(input.c_str()) : nullptr, send_counts.data(), send_displs.data(),
+  std::vector<char> input_chars;
+  if (rank == 0) {
+    input_chars.assign(input.begin(), input.end());
+  }
+
+  MPI_Scatterv(input_chars.empty() && rank == 0 ? nullptr : input_chars.data(), send_counts.data(), send_displs.data(),
                MPI_CHAR, local_data.data(), local_size, MPI_CHAR, 0, MPI_COMM_WORLD);
 
   std::string local_input(local_data.begin(), local_data.end());
@@ -104,13 +123,7 @@ bool VdovinAWordsCountingMPI::RunImpl() {
   MPI_Reduce(&counter, &counter_sum, 1, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
 
   if (rank == 0) {
-    for (int i = 1; i < size; ++i) {
-      const std::size_t prev_end_idx = (static_cast<std::size_t>(i) * 2U) - 1U;
-      const std::size_t curr_begin_idx = prev_end_idx + 1U;
-      if ((all_flags[prev_end_idx] == 1) && (all_flags[curr_begin_idx] == 1)) {
-        --counter_sum;
-      }
-    }
+    ProcessBoundaryFlagMatching(all_flags, size, counter_sum);
     GetOutput() = counter_sum;
   }
 
